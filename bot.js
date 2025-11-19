@@ -20,7 +20,7 @@ const ticketActivity = {}; // clé = channel.id, valeur = timestamp du dernier m
 // Stocker quel staff a claim chaque ticket
 const ticketClaims = {}; // clé = channel.id, valeur = staffMemberId
 
-const { loadEvents } = require("./eventHandler");
+const { loadEvents } = require("./events/eventHandler");
 
 const client = new Client({
   intents: [
@@ -821,3 +821,4 @@ client.on("messageCreate", async (message) => {
 loadEvents(client);
 
 client.login(TOKEN);
+
