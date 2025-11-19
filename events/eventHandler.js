@@ -1,16 +1,16 @@
-// handlers/eventHandler.js
 const fs = require("fs");
 const path = require("path");
 
 function loadEvents(client) {
-  const eventsPath = path.join(__dirname, "..", "events");
+  const eventsPath = path.join(__dirname); // Dossier events/ lui-même
 
-  const categories = fs.readdirSync(eventsPath);
-  for (const category of categories) {
-    const eventFiles = fs.readdirSync(path.join(eventsPath, category)).filter(file => file.endsWith(".js"));
+  const eventFiles = fs.readdirSync(eventsPath).filter(file => 
+    file.endsWith(".js") && file !== "eventHandler.js"
+  );
 
-    for (const file of eventFiles) {
-      const event = require(path.join(eventsPath, category, file));
+  for (const file of eventFiles) {
+    try {
+      const event = require(path.join(eventsPath, file));
 
       if (!event.name || !event.execute) {
         console.log(`⚠️ Fichier ${file} ignoré : il manque "name" ou "execute".`);
@@ -23,7 +23,9 @@ function loadEvents(client) {
         client.on(event.name, (...args) => event.execute(...args, client));
       }
 
-      console.log(`✅ Événement chargé : ${event.name} (${category}/${file})`);
+      console.log(`✅ Événement chargé : ${event.name} (${file})`);
+    } catch (error) {
+      console.error(`❌ Erreur chargement ${file}:`, error.message);
     }
   }
 }
