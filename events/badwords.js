@@ -17,25 +17,17 @@ module.exports = {
     for (const word of bannedWords) {
       if (lower.includes(word)) {
         try {
-          console.log(`🔍 Mot interdit détecté: "${word}" par ${message.author.tag}`);
-          
           await message.delete();
           await message.channel.send(`🚫 ${message.author}, ton message contenait un mot interdit et a été supprimé.`);
 
           if (!warnings[message.author.id]) warnings[message.author.id] = 0;
           warnings[message.author.id] += 1;
 
-          // ✅ DÉBOGAGE DÉTAILLÉ
+          // ✅ CORRIGÉ : LOGSM_CHANNEL_ID
           const logChannelId = process.env.LOGSM_CHANNEL_ID;
-          console.log(`📋 LOGSM_CHANNEL_ID: ${logChannelId}`);
-          
           if (logChannelId) {
-            console.log(`🔍 Recherche du salon ${logChannelId}...`);
             const logChannel = client.channels.cache.get(logChannelId);
-            
             if (logChannel) {
-              console.log(`✅ Salon trouvé: ${logChannel.name}`);
-              
               const deletedContent = message.content
                 ? (message.content.length > 1000 ? message.content.slice(0, 1000) + "..." : message.content)
                 : "Aucun contenu";
@@ -53,21 +45,49 @@ module.exports = {
                 .setTimestamp()
                 .setFooter({ text: 'Auto-modération • Système de warnings' });
 
-              console.log(`📤 Envoi de l'embed...`);
               await logChannel.send({ embeds: [embed] });
-              console.log(`✅ Embed envoyé avec succès!`);
-              
-            } else {
-              console.log(`❌ Salon non trouvé avec l'ID: ${logChannelId}`);
             }
-          } else {
-            console.log(`❌ LOGSM_CHANNEL_ID non défini`);
           }
 
           console.log(`🧹 Message supprimé - ${message.author.tag} - Avertissement: ${warnings[message.author.id]}/3`);
 
+          if (warnings[message.author.id] >= 3) {
+            try {
+              const duration = 10 * 60 * 1000;
+              if (message.member && message.member.timeout) {
+                await message.member.timeout(duration, "Accumulation de 3 avertissements");
+              }
+
+              // ✅ CORRIGÉ ICI AUSSI
+              if (logChannelId) {
+                const logChannel = client.channels.cache.get(logChannelId);
+                if (logChannel) {
+                  const embedTimeout = new EmbedBuilder()
+                    .setColor(0xFF4500)
+                    .setTitle("🔇 Timeout appliqué")
+                    .setDescription(`**${message.author.tag}** a été timeout pour 10 minutes`)
+                    .addFields(
+                      { name: "👤 Utilisateur", value: `${message.author.tag} (\`${message.author.id}\`)`, inline: true },
+                      { name: "⏱️ Durée", value: `10 minutes`, inline: true },
+                      { name: "📝 Raison", value: `Accumulation de 3 avertissements` },
+                      { name: "⚠️ Total d'avertissements", value: `3/3`, inline: true }
+                    )
+                    .setTimestamp()
+                    .setFooter({ text: 'Auto-modération • Timeout automatique' });
+
+                  await logChannel.send({ embeds: [embedTimeout] });
+                }
+              }
+
+              warnings[message.author.id] = 0;
+
+            } catch (err) {
+              console.error("Erreur lors du timeout :", err);
+            }
+          }
+
         } catch (err) {
-          console.error("❌ Erreur dans l'auto-modération:", err);
+          console.error("Erreur suppression message :", err);
         }
         break;
       }
