@@ -1,3 +1,23 @@
+// Gestion d'erreurs globale ULTRA-ROBUSTE
+process.on('unhandledRejection', (error) => {
+  console.error('❌ Erreur non gérée (unhandledRejection):', error);
+});
+
+process.on('uncaughtException', (error) => {
+  console.error('💥 Erreur critique (uncaughtException):', error);
+  console.log('🔄 Le bot continue de fonctionner...');
+  // NE PAS quitter le processus !
+});
+
+process.on('warning', (warning) => {
+  console.warn('⚠️ Avertissement système:', warning);
+});
+
+// Empêcher toute fermeture
+process.on('exit', (code) => {
+  console.log(`🚨 ATTENTION: Processus en cours de fermeture (code: ${code})`);
+  console.log('🔄 Tentative de maintien en vie...');
+});
 const {
   Client,
   GatewayIntentBits,
@@ -883,6 +903,7 @@ app.listen(port, () => {
 loadEvents(client);
 
 client.login(TOKEN);
+
 
 
 
