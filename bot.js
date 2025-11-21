@@ -553,14 +553,15 @@ async function generateHTMLArchive(channel, member) {
     let content = m.cleanContent || "";
     const attachmentsHTML = [];
 
-    const files = ticketFiles[channel.id]?.[m.id] || [];
-    for (const file of files) {
-      const ext = path.extname(file).toLowerCase();
-      if ([".png", ".jpg", ".jpeg", ".gif", ".webp"].includes(ext)) {
-        const base64 = fs.readFileSync(file, { encoding: "base64" });
-        attachmentsHTML.push(`<div class="attachment"><img src="data:image/${ext.slice(1)};base64,${base64}" class="image"></div>`);
+    // VERSION CORRIGÉE : Utiliser les attachments Discord directement
+    for (const attachment of m.attachments.values()) {
+      const ext = attachment.name ? attachment.name.split('.').pop().toLowerCase() : '';
+      if (["png", "jpg", "jpeg", "gif", "webp"].includes(ext)) {
+        // Lien direct vers l'image sans téléchargement
+        attachmentsHTML.push(`<div class="attachment"><img src="${attachment.url}" class="image" alt="${attachment.name}"></div>`);
       } else {
-        attachmentsHTML.push(`<div class="attachment"><a href="${file}" target="_blank">📎 ${path.basename(file)}</a></div>`);
+        // Lien direct vers le fichier
+        attachmentsHTML.push(`<div class="attachment"><a href="${attachment.url}" target="_blank">📎 ${attachment.name}</a></div>`);
       }
     }
 
@@ -821,4 +822,5 @@ client.on("messageCreate", async (message) => {
 loadEvents(client);
 
 client.login(TOKEN);
+
 
