@@ -120,169 +120,6 @@ client.on("messageCreate", async (message) => {
   }
 });
 
-// 🎫 Création du ticket AVEC BOUTONS
-client.on("interactionCreate", async (interaction) => {
-  if (!interaction.isButton()) return;
-  
-  // Vérifie si c'est un bouton de ticket
-  const ticketTypes = ["ticket-jeu", "ticket-grade", "ticket-remboursement", "ticket-report", "ticket-autre"];
-  if (!ticketTypes.includes(interaction.customId)) return;
-
-  const guild = interaction.guild;
-  const user = interaction.user;
-  const ticketType = interaction.customId.replace("ticket-", "");
-  
-  // Nouveau nom de ticket avec timestamp pour éviter les conflits
-  const timestamp = Date.now();
-  const ticketName = `ticket-${ticketType}-${user.username}-${timestamp}`.toLowerCase().slice(0, 100);
-
-  // Vérifie seulement les tickets OUVERTS existants pour cet utilisateur
-  const userOpenTickets = guild.channels.cache.filter(channel => {
-    if (channel.type !== 0 || !channel.name.startsWith('ticket-')) return false;
-    if (!channel.name.includes(user.username.toLowerCase())) return false;
-    return true;
-  });
-
-  if (userOpenTickets.size > 0) {
-    const openTicket = userOpenTickets.first();
-    return interaction.reply({
-      content: `❗ Vous avez déjà un ticket ouvert : ${openTicket}. Veuillez d'abord fermer votre ticket actuel avant d'en créer un nouveau.`,
-      ephemeral: true,
-    });
-  }
-
-  // Crée le salon privé avec permissions COMPLÈTES pour tous les rôles staff
-  const ticketChannel = await guild.channels.create({
-    name: ticketName,
-    type: 0,
-    parent: CATEGORY_ID,
-    permissionOverwrites: [
-      { 
-        id: guild.roles.everyone, 
-        deny: [PermissionsBitField.Flags.ViewChannel] 
-      },
-      {
-        id: user.id,
-        allow: [
-          PermissionsBitField.Flags.ViewChannel,
-          PermissionsBitField.Flags.SendMessages,
-          PermissionsBitField.Flags.ReadMessageHistory,
-          PermissionsBitField.Flags.AttachFiles,
-        ],
-      },
-      // PERMISSIONS POUR TOUS LES RÔLES STAFF
-      {
-        id: HELPER_ROLE_ID,
-        allow: [
-          PermissionsBitField.Flags.ViewChannel,
-          PermissionsBitField.Flags.SendMessages,
-          PermissionsBitField.Flags.ReadMessageHistory,
-          PermissionsBitField.Flags.AttachFiles,
-        ],
-      },
-      {
-        id: MODO_ROLE_ID,
-        allow: [
-          PermissionsBitField.Flags.ViewChannel,
-          PermissionsBitField.Flags.SendMessages,
-          PermissionsBitField.Flags.ReadMessageHistory,
-          PermissionsBitField.Flags.AttachFiles,
-        ],
-      },
-      {
-        id: SUPERMODO_ROLE_ID,
-        allow: [
-          PermissionsBitField.Flags.ViewChannel,
-          PermissionsBitField.Flags.SendMessages,
-          PermissionsBitField.Flags.ReadMessageHistory,
-          PermissionsBitField.Flags.AttachFiles,
-        ],
-      },
-      {
-        id: ADMIN_ROLE_ID,
-        allow: [
-          PermissionsBitField.Flags.ViewChannel,
-          PermissionsBitField.Flags.SendMessages,
-          PermissionsBitField.Flags.ReadMessageHistory,
-          PermissionsBitField.Flags.AttachFiles,
-        ],
-      },
-      {
-        id: DEV_ROLE_ID,
-        allow: [
-          PermissionsBitField.Flags.ViewChannel,
-          PermissionsBitField.Flags.SendMessages,
-          PermissionsBitField.Flags.ReadMessageHistory,
-          PermissionsBitField.Flags.AttachFiles,
-        ],
-      },
-      {
-        id: client.user.id,
-        allow: [
-          PermissionsBitField.Flags.ViewChannel,
-          PermissionsBitField.Flags.SendMessages,
-          PermissionsBitField.Flags.ReadMessageHistory,
-          PermissionsBitField.Flags.ManageChannels,
-          PermissionsBitField.Flags.ManageMessages,
-        ],
-      },
-    ],
-  });
-
-  // === Boutons Claim + Fermer dans le même message ===
-  const claimButton = new ButtonBuilder()
-    .setCustomId("claim-ticket")
-    .setLabel("🔧​Prendre en charge")
-    .setStyle(ButtonStyle.Primary);
-
-  const transferButton = new ButtonBuilder()
-    .setCustomId("transfer-ticket")
-    .setLabel("📜​ Résumer le ticket")
-    .setStyle(ButtonStyle.Secondary);
-  
-  const closeButton = new ButtonBuilder()
-    .setCustomId("close-ticket")
-    .setLabel("❌ Fermer le ticket")
-    .setStyle(ButtonStyle.Danger);
-
-  const buttonRow = new ActionRowBuilder().addComponents(claimButton, transferButton, closeButton);
-
-  // Déterminer le nom de catégorie pour l'affichage
-  const categoryNames = {
-    jeu: "🎰 Problème en jeu",
-    grade: "🗣️ Demande de grade", 
-    remboursement: "💰 Demande de remboursement",
-    report: "❗ Report / Contestation",
-    autre: "💬 Autre"
-  };
-
-  const categoryDisplayName = categoryNames[ticketType] || ticketType;
-
-  // Embed de bienvenue stylé
-  const welcomeEmbed = new EmbedBuilder()
-    .setColor("#5865F2")
-    .setTitle("🎟️ Ticket créé avec succès !")
-    .setDescription(
-      `Bonjour ${user} 👋\n\n**Catégorie :** ${categoryDisplayName}\n\nMerci d'avoir contacté le support.\nUn membre du staff va bientôt vous assister.\n\n> Pendant ce temps, veuillez décrire **clairement votre problème** afin de faciliter la prise en charge.`
-    )
-    .setFooter({
-      text: "Système de tickets",
-      iconURL: guild.iconURL(),
-    })
-    .setTimestamp();
-
-  await ticketChannel.send({
-    content: `${user}`,
-    embeds: [welcomeEmbed],
-    components: [buttonRow],
-  });
-
-  await interaction.reply({
-    content: `✅ Votre ticket a été créé : ${ticketChannel}`,
-    ephemeral: true,
-  });
-});
-
 // === FONCTION POUR SYNCHRONISER LES PERMISSIONS ===
 async function syncTicketPermissions(channel, targetCategory, ticketOwner) {
   const guild = channel.guild;
@@ -380,155 +217,500 @@ async function syncTicketPermissions(channel, targetCategory, ticketOwner) {
   await channel.permissionOverwrites.set(permissionOverwrites);
 }
 
-// === GESTION DES BOUTONS DANS LES TICKETS ===
-
-// 🛠️ Gestion du bouton Claim - VERSION AVEC SYNCHRONISATION
+// === GESTION UNIFIÉE DES INTERACTIONS ===
 client.on("interactionCreate", async (interaction) => {
-  if (!interaction.isButton()) return;
-  if (interaction.customId !== "claim-ticket") return;
-
-  const member = interaction.member;
-  const channel = interaction.channel;
-  const guild = interaction.guild;
-
-  // Vérifie que seul un staff peut claim
-  if (
-    !member.roles.cache.has(HELPER_ROLE_ID) &&
-    !member.roles.cache.has(MODO_ROLE_ID) &&
-    !member.roles.cache.has(SUPERMODO_ROLE_ID) &&
-    !member.roles.cache.has(ADMIN_ROLE_ID) &&
-    !member.roles.cache.has(DEV_ROLE_ID)
-  ) {
-    return interaction.reply({
-      content: "🚫 Seul un membre du staff peut prendre ce ticket.",
-      ephemeral: true,
-    });
-  }
-
-  // Détermine le rôle du staff et la catégorie cible
-  let targetCategory;
-  let grade;
-
-  if (member.roles.cache.has(SUPERMODO_ROLE_ID)) {
-    targetCategory = SUPERMODO_CATEGORY_ID;
-    grade = "Super-Modo";
-  } else if (member.roles.cache.has(MODO_ROLE_ID)) {
-    targetCategory = MODO_CATEGORY_ID;
-    grade = "Modérateur";
-  } else if (member.roles.cache.has(HELPER_ROLE_ID)) {
-    targetCategory = HELPER_CATEGORY_ID;
-    grade = "Helper";
-  } else if (member.roles.cache.has(ADMIN_ROLE_ID)) {
-    targetCategory = ADMIN_CATEGORY_ID;
-    grade = "Admin";
-  } else { 
-    targetCategory = DEV_CATEGORY_ID;
-    grade = "Dev";
-  }
-
   try {
-    // Récupère l'utilisateur qui a créé le ticket depuis le nom du channel
-    const ticketName = channel.name;
-    const usernameMatch = ticketName.match(/ticket-[^-]+-(.+)-/);
-    let ticketOwner = null;
+    // === BOUTONS DE CRÉATION DE TICKETS ===
+    if (interaction.isButton() && interaction.customId.startsWith('ticket-')) {
+      const ticketTypes = ["ticket-jeu", "ticket-grade", "ticket-remboursement", "ticket-report", "ticket-autre"];
+      if (ticketTypes.includes(interaction.customId)) {
+        const guild = interaction.guild;
+        const user = interaction.user;
+        const ticketType = interaction.customId.replace("ticket-", "");
+        
+        // Nouveau nom de ticket avec timestamp pour éviter les conflits
+        const timestamp = Date.now();
+        const ticketName = `ticket-${ticketType}-${user.username}-${timestamp}`.toLowerCase().slice(0, 100);
+
+        // Vérifie seulement les tickets OUVERTS existants pour cet utilisateur
+        const userOpenTickets = guild.channels.cache.filter(channel => {
+          if (channel.type !== 0 || !channel.name.startsWith('ticket-')) return false;
+          if (!channel.name.includes(user.username.toLowerCase())) return false;
+          return true;
+        });
+
+        if (userOpenTickets.size > 0) {
+          const openTicket = userOpenTickets.first();
+          return interaction.reply({
+            content: `❗ Vous avez déjà un ticket ouvert : ${openTicket}. Veuillez d'abord fermer votre ticket actuel avant d'en créer un nouveau.`,
+            ephemeral: true,
+          });
+        }
+
+        // Crée le salon privé avec permissions COMPLÈTES pour tous les rôles staff
+        const ticketChannel = await guild.channels.create({
+          name: ticketName,
+          type: 0,
+          parent: CATEGORY_ID,
+          permissionOverwrites: [
+            { 
+              id: guild.roles.everyone, 
+              deny: [PermissionsBitField.Flags.ViewChannel] 
+            },
+            {
+              id: user.id,
+              allow: [
+                PermissionsBitField.Flags.ViewChannel,
+                PermissionsBitField.Flags.SendMessages,
+                PermissionsBitField.Flags.ReadMessageHistory,
+                PermissionsBitField.Flags.AttachFiles,
+              ],
+            },
+            // PERMISSIONS POUR TOUS LES RÔLES STAFF
+            {
+              id: HELPER_ROLE_ID,
+              allow: [
+                PermissionsBitField.Flags.ViewChannel,
+                PermissionsBitField.Flags.SendMessages,
+                PermissionsBitField.Flags.ReadMessageHistory,
+                PermissionsBitField.Flags.AttachFiles,
+              ],
+            },
+            {
+              id: MODO_ROLE_ID,
+              allow: [
+                PermissionsBitField.Flags.ViewChannel,
+                PermissionsBitField.Flags.SendMessages,
+                PermissionsBitField.Flags.ReadMessageHistory,
+                PermissionsBitField.Flags.AttachFiles,
+              ],
+            },
+            {
+              id: SUPERMODO_ROLE_ID,
+              allow: [
+                PermissionsBitField.Flags.ViewChannel,
+                PermissionsBitField.Flags.SendMessages,
+                PermissionsBitField.Flags.ReadMessageHistory,
+                PermissionsBitField.Flags.AttachFiles,
+              ],
+            },
+            {
+              id: ADMIN_ROLE_ID,
+              allow: [
+                PermissionsBitField.Flags.ViewChannel,
+                PermissionsBitField.Flags.SendMessages,
+                PermissionsBitField.Flags.ReadMessageHistory,
+                PermissionsBitField.Flags.AttachFiles,
+              ],
+            },
+            {
+              id: DEV_ROLE_ID,
+              allow: [
+                PermissionsBitField.Flags.ViewChannel,
+                PermissionsBitField.Flags.SendMessages,
+                PermissionsBitField.Flags.ReadMessageHistory,
+                PermissionsBitField.Flags.AttachFiles,
+              ],
+            },
+            {
+              id: client.user.id,
+              allow: [
+                PermissionsBitField.Flags.ViewChannel,
+                PermissionsBitField.Flags.SendMessages,
+                PermissionsBitField.Flags.ReadMessageHistory,
+                PermissionsBitField.Flags.ManageChannels,
+                PermissionsBitField.Flags.ManageMessages,
+              ],
+            },
+          ],
+        });
+
+        // === Boutons Claim + Fermer dans le même message ===
+        const claimButton = new ButtonBuilder()
+          .setCustomId("claim-ticket")
+          .setLabel("🔧​Prendre en charge")
+          .setStyle(ButtonStyle.Primary);
+
+        const transferButton = new ButtonBuilder()
+          .setCustomId("transfer-ticket")
+          .setLabel("📜​ Résumer le ticket")
+          .setStyle(ButtonStyle.Secondary);
+        
+        const closeButton = new ButtonBuilder()
+          .setCustomId("close-ticket")
+          .setLabel("❌ Fermer le ticket")
+          .setStyle(ButtonStyle.Danger);
+
+        const buttonRow = new ActionRowBuilder().addComponents(claimButton, transferButton, closeButton);
+
+        // Déterminer le nom de catégorie pour l'affichage
+        const categoryNames = {
+          jeu: "🎰 Problème en jeu",
+          grade: "🗣️ Demande de grade", 
+          remboursement: "💰 Demande de remboursement",
+          report: "❗ Report / Contestation",
+          autre: "💬 Autre"
+        };
+
+        const categoryDisplayName = categoryNames[ticketType] || ticketType;
+
+        // Embed de bienvenue stylé
+        const welcomeEmbed = new EmbedBuilder()
+          .setColor("#5865F2")
+          .setTitle("🎟️ Ticket créé avec succès !")
+          .setDescription(
+            `Bonjour ${user} 👋\n\n**Catégorie :** ${categoryDisplayName}\n\nMerci d'avoir contacté le support.\nUn membre du staff va bientôt vous assister.\n\n> Pendant ce temps, veuillez décrire **clairement votre problème** afin de faciliter la prise en charge.`
+          )
+          .setFooter({
+            text: "Système de tickets",
+            iconURL: guild.iconURL(),
+          })
+          .setTimestamp();
+
+        await ticketChannel.send({
+          content: `${user}`,
+          embeds: [welcomeEmbed],
+          components: [buttonRow],
+        });
+
+        await interaction.reply({
+          content: `✅ Votre ticket a été créé : ${ticketChannel}`,
+          ephemeral: true,
+        });
+        return;
+      }
+    }
+
+    // === BOUTONS DANS LES TICKETS ===
+    if (interaction.isButton()) {
+      // 🛠️ Gestion du bouton Claim
+      if (interaction.customId === "claim-ticket") {
+        const member = interaction.member;
+        const channel = interaction.channel;
+        const guild = interaction.guild;
+
+        // Vérifie que seul un staff peut claim
+        if (
+          !member.roles.cache.has(HELPER_ROLE_ID) &&
+          !member.roles.cache.has(MODO_ROLE_ID) &&
+          !member.roles.cache.has(SUPERMODO_ROLE_ID) &&
+          !member.roles.cache.has(ADMIN_ROLE_ID) &&
+          !member.roles.cache.has(DEV_ROLE_ID)
+        ) {
+          return interaction.reply({
+            content: "🚫 Seul un membre du staff peut prendre ce ticket.",
+            ephemeral: true,
+          });
+        }
+
+        // Détermine le rôle du staff et la catégorie cible
+        let targetCategory;
+        let grade;
+
+        if (member.roles.cache.has(SUPERMODO_ROLE_ID)) {
+          targetCategory = SUPERMODO_CATEGORY_ID;
+          grade = "Super-Modo";
+        } else if (member.roles.cache.has(MODO_ROLE_ID)) {
+          targetCategory = MODO_CATEGORY_ID;
+          grade = "Modérateur";
+        } else if (member.roles.cache.has(HELPER_ROLE_ID)) {
+          targetCategory = HELPER_CATEGORY_ID;
+          grade = "Helper";
+        } else if (member.roles.cache.has(ADMIN_ROLE_ID)) {
+          targetCategory = ADMIN_CATEGORY_ID;
+          grade = "Admin";
+        } else { 
+          targetCategory = DEV_CATEGORY_ID;
+          grade = "Dev";
+        }
+
+        // Récupère l'utilisateur qui a créé le ticket depuis le nom du channel
+        const ticketName = channel.name;
+        const usernameMatch = ticketName.match(/ticket-[^-]+-(.+)-/);
+        let ticketOwner = null;
+        
+        if (usernameMatch) {
+          const username = usernameMatch[1];
+          // Trouve l'utilisateur par son username
+          ticketOwner = guild.members.cache.find(member => 
+            member.user.username.toLowerCase() === username.toLowerCase()
+          );
+        }
+
+        if (!ticketOwner) {
+          return interaction.reply({
+            content: "⚠️ Impossible de trouver le propriétaire du ticket.",
+            ephemeral: true,
+          });
+        }
+
+        // SYNCHRONISE LES PERMISSIONS AVANT LE DÉPLACEMENT
+        await syncTicketPermissions(channel, targetCategory, ticketOwner);
+
+        // Déplace le ticket
+        await channel.setParent(targetCategory, { 
+          lockPermissions: false // IMPORTANT: ne pas verrouiller les permissions
+        });
+
+        // STOCKER QUI A CLAIM LE TICKET
+        ticketClaims[channel.id] = member.id;
+
+        // Embed de confirmation Claim
+        const claimedEmbed = new EmbedBuilder()
+          .setColor("#43B581")
+          .setTitle("✅ Ticket pris en charge")
+          .setDescription(`Le ticket est maintenant géré par ${member} (${grade}).\n\n**Catégorie :** ${grade}\n\nLe staff sera notifié à chaque nouveau message.`)
+          .setFooter({ text: "Support en cours de traitement" })
+          .setTimestamp();
+
+        await interaction.reply({ embeds: [claimedEmbed], ephemeral: false });
+        return;
+      }
+
+      // 🔁 Bouton "Résumer le ticket"
+      if (interaction.customId === "transfer-ticket") {
+        // Vérifie que le membre est staff
+        if (
+          !interaction.member.roles.cache.has(HELPER_ROLE_ID) &&
+          !interaction.member.roles.cache.has(MODO_ROLE_ID) &&
+          !interaction.member.roles.cache.has(ADMIN_ROLE_ID) &&
+          !interaction.member.roles.cache.has(DEV_ROLE_ID) &&
+          !interaction.member.roles.cache.has(SUPERMODO_ROLE_ID)
+        ) {
+          return interaction.reply({
+            content: "🚫 Seul un membre du staff peut transférer un ticket.",
+            ephemeral: true,
+          });
+        }
+
+        // Création de la modale
+        const modal = new ModalBuilder()
+          .setCustomId("transfer-modal")
+          .setTitle("📜 Résumer de ticket");
+
+        // Champs texte
+        const playerName = new TextInputBuilder()
+          .setCustomId("player-name")
+          .setLabel("Nom du joueur concerné")
+          .setStyle(TextInputStyle.Short)
+          .setRequired(true);
+
+        const problemField = new TextInputBuilder()
+          .setCustomId("problem-description")
+          .setLabel("Description du problème")
+          .setStyle(TextInputStyle.Paragraph)
+          .setRequired(true);
+
+        const targetStaff = new TextInputBuilder()
+          .setCustomId("target-staff")
+          .setLabel("Staff destinataire (pseudo ou rôle)")
+          .setStyle(TextInputStyle.Short)
+          .setRequired(true);
+
+        // Organisation en lignes
+        const row1 = new ActionRowBuilder().addComponents(playerName);
+        const row2 = new ActionRowBuilder().addComponents(problemField);
+        const row3 = new ActionRowBuilder().addComponents(targetStaff);
+
+        modal.addComponents(row1, row2, row3);
+
+        // Envoie la modale à l'utilisateur
+        await interaction.showModal(modal);
+        return;
+      }
+
+      // ❌ Bouton Fermer le ticket
+      if (interaction.customId === "close-ticket") {
+        const channel = interaction.channel;
+        const member = interaction.member;
+
+        const confirmButton = new ButtonBuilder().setCustomId("confirm-close").setLabel("🔒 Oui, fermer le ticket").setStyle(ButtonStyle.Danger);
+        const cancelButton = new ButtonBuilder().setCustomId("cancel-close").setLabel("🔁 Annuler").setStyle(ButtonStyle.Secondary);
+        const row = new ActionRowBuilder().addComponents(confirmButton, cancelButton);
+
+        const confirmEmbed = new EmbedBuilder()
+          .setColor("#ED4245")
+          .setTitle("❌ Confirmation de fermeture")
+          .setDescription("Êtes-vous sûr de vouloir fermer ce ticket ?\n\n> 🔒 Oui\n> 🔁 Annuler");
+
+        await interaction.reply({ embeds: [confirmEmbed], components: [row], ephemeral: true });
+        return;
+      }
+
+      // ✅ Bouton Confirmer fermeture
+      if (interaction.customId === "confirm-close") {
+        const channel = interaction.channel;
+        const member = interaction.member;
+        
+        await interaction.update({ 
+          embeds: [new EmbedBuilder().setColor("#ED4245").setTitle("🕒 Fermeture du ticket").setDescription("Fermeture en cours...")], 
+          components: [] 
+        });
+
+        setTimeout(async () => {
+          try {
+            const html = await generateHTMLArchive(channel, member);
+            
+            // ✅ CORRIGÉ : Créer le buffer en mémoire sans écrire de fichier
+            const buffer = Buffer.from(html, 'utf-8');
+            
+            const logChannel = client.channels.cache.get(LOGS_CHANNEL_ID);
+            if (logChannel) {
+              const logEmbed = new EmbedBuilder()
+                .setColor("#2b2d31")
+                .setTitle("🗂️ Ticket archivé")
+                .setDescription(`**Ticket :** ${channel.name}\n**Fermé par :** ${member}\n**Date :** <t:${Math.floor(Date.now()/1000)}:F>`)
+                .setFooter({ text: "Système de tickets - Archive HTML" })
+                .setTimestamp();
+
+              // ✅ CORRIGÉ : Envoyer le fichier directement depuis le buffer
+              await logChannel.send({ 
+                embeds: [logEmbed], 
+                files: [{ attachment: buffer, name: `${channel.name}.html` }] 
+              });
+            }
+
+            // Supprimer le claim et le ticket
+            delete ticketClaims[channel.id];
+            await channel.delete();
+            
+          } catch (err) {
+            console.error("Erreur fermeture ticket :", err);
+            // Fermer le ticket même en cas d'erreur
+            try {
+              delete ticketClaims[channel.id];
+              await channel.delete();
+            } catch (deleteError) {
+              console.error("Erreur suppression channel:", deleteError);
+            }
+          }
+        }, 3000);
+        return;
+      }
+
+      // 🔁 Bouton Annuler fermeture
+      if (interaction.customId === "cancel-close") {
+        await interaction.update({ 
+          embeds: [new EmbedBuilder().setColor("#57F287").setDescription("✅ Fermeture annulée. Le ticket reste ouvert !")], 
+          components: [] 
+        });
+        return;
+      }
+    }
+
+    // === MODALS ===
+    if (interaction.isModalSubmit()) {
+      if (interaction.customId === "transfer-modal") {
+        const playerName = interaction.fields.getTextInputValue("player-name");
+        const problemDescription = interaction.fields.getTextInputValue("problem-description");
+        const targetStaff = interaction.fields.getTextInputValue("target-staff").toLowerCase();
+        const channel = interaction.channel;
+        const guild = interaction.guild;
+
+        let targetCategory;
+        let targetRole;
+        let roleLabel;
+
+        // 🔍 Déterminer le rôle / catégorie cible selon ce que le staff écrit
+        if (targetStaff.includes("supermodo") || targetStaff.includes("super-modo")) {
+          targetCategory = SUPERMODO_CATEGORY_ID;
+          targetRole = SUPERMODO_ROLE_ID;
+          roleLabel = "Super-Modo";
+        } else if (targetStaff.includes("modo") || targetStaff.includes("modérateur")) {
+          targetCategory = MODO_CATEGORY_ID;
+          targetRole = MODO_ROLE_ID;
+          roleLabel = "Modérateur";
+        } else if (targetStaff.includes("admin") || targetStaff.includes("administrateur")) {
+          targetCategory = ADMIN_CATEGORY_ID;
+          targetRole = ADMIN_ROLE_ID;
+          roleLabel = "Admin";
+        } else if (targetStaff.includes("dev") || targetStaff.includes("développeur")) {
+          targetCategory = DEV_CATEGORY_ID;
+          targetRole = DEV_ROLE_ID;
+          roleLabel = "Dev";
+        } else if (targetStaff.includes("helper") || targetStaff.includes("assistant")) {
+          targetCategory = HELPER_CATEGORY_ID;
+          targetRole = HELPER_ROLE_ID;
+          roleLabel = "Helper";
+        } else {
+          return interaction.reply({
+            content: "⚠️ Impossible d'identifier le rôle cible. Utilise 'Helper', 'Modo', 'SuperModo', 'Admin', 'Dev'.",
+            ephemeral: true,
+          });
+        }
+
+        // Récupère l'utilisateur qui a créé le ticket depuis le nom du channel
+        const ticketName = channel.name;
+        const usernameMatch = ticketName.match(/ticket-[^-]+-(.+)-/);
+        let ticketOwner = null;
+        
+        if (usernameMatch) {
+          const username = usernameMatch[1];
+          // Trouve l'utilisateur par son username
+          ticketOwner = guild.members.cache.find(member => 
+            member.user.username.toLowerCase() === username.toLowerCase()
+          );
+        }
+
+        if (!ticketOwner) {
+          return interaction.reply({
+            content: "⚠️ Impossible de trouver le propriétaire du ticket.",
+            ephemeral: true,
+          });
+        }
+
+        // SYNCHRONISE LES PERMISSIONS AVANT LE DÉPLACEMENT
+        await syncTicketPermissions(channel, targetCategory, ticketOwner);
+
+        // 🔁 Déplace le ticket
+        await channel.setParent(targetCategory, { 
+          lockPermissions: false // IMPORTANT: ne pas verrouiller les permissions
+        });
+
+        // Si un transfert a lieu, on supprime le claim actuel
+        // Le nouveau staff devra reclamer le ticket
+        delete ticketClaims[channel.id];
+
+        // 🧾 Embed de résumé
+        const embed = new EmbedBuilder()
+          .setColor("#FEE75C")
+          .setTitle("📜 Résumer de ticket")
+          .setDescription(
+            `**👤 Joueur :** ${playerName}\n**🧾 Problème :** ${problemDescription}\n**🎯 Transféré à :** ${roleLabel}`
+          )
+          .setFooter({ text: `Transféré par ${interaction.user.tag}` })
+          .setTimestamp();
+
+        await interaction.reply({
+          embeds: [embed],
+          ephemeral: false,
+        });
+
+        console.log(`✅ Ticket ${channel.name} transféré vers ${roleLabel}`);
+        return;
+      }
+    }
+
+  } catch (error) {
+    // GESTION D'ERREUR SPÉCIFIQUE
+    if (error.code === 10062) {
+      console.log('⚠️ Interaction expirée ignorée');
+      return;
+    }
     
-    if (usernameMatch) {
-      const username = usernameMatch[1];
-      // Trouve l'utilisateur par son username
-      ticketOwner = guild.members.cache.find(member => 
-        member.user.username.toLowerCase() === username.toLowerCase()
-      );
+    console.error('❌ Erreur interaction:', error);
+    
+    // Essayer de répondre avec un message d'erreur
+    if (interaction.isRepliable() && !interaction.replied) {
+      try {
+        await interaction.reply({ 
+          content: '❌ Une erreur est survenue', 
+          ephemeral: true 
+        });
+      } catch (replyError) {
+        // Ignorer si impossible de répondre
+      }
     }
-
-    if (!ticketOwner) {
-      return interaction.reply({
-        content: "⚠️ Impossible de trouver le propriétaire du ticket.",
-        ephemeral: true,
-      });
-    }
-
-    // SYNCHRONISE LES PERMISSIONS AVANT LE DÉPLACEMENT
-    await syncTicketPermissions(channel, targetCategory, ticketOwner);
-
-    // Déplace le ticket
-    await channel.setParent(targetCategory, { 
-      lockPermissions: false // IMPORTANT: ne pas verrouiller les permissions
-    });
-
-    // STOCKER QUI A CLAIM LE TICKET
-    ticketClaims[channel.id] = member.id;
-
-    // Embed de confirmation Claim
-    const claimedEmbed = new EmbedBuilder()
-      .setColor("#43B581")
-      .setTitle("✅ Ticket pris en charge")
-      .setDescription(`Le ticket est maintenant géré par ${member} (${grade}).\n\n**Catégorie :** ${grade}\n\nLe staff sera notifié à chaque nouveau message.`)
-      .setFooter({ text: "Support en cours de traitement" })
-      .setTimestamp();
-
-    await interaction.reply({ embeds: [claimedEmbed], ephemeral: false });
-  } catch (err) {
-    console.error("Erreur Claim :", err);
-    interaction.reply({
-      content: "⚠️ Erreur lors du déplacement du ticket.",
-      ephemeral: true,
-    });
-  }
-});
-
-// === TRANSFERT DE TICKET ===
-client.on("interactionCreate", async (interaction) => {
-  if (!interaction.isButton()) return;
-
-  // 🔁 Si le bouton "Résumer le ticket" est cliqué
-  if (interaction.customId === "transfer-ticket") {
-    // Vérifie que le membre est staff
-    if (
-      !interaction.member.roles.cache.has(HELPER_ROLE_ID) &&
-      !interaction.member.roles.cache.has(MODO_ROLE_ID) &&
-      !interaction.member.roles.cache.has(ADMIN_ROLE_ID) &&
-      !interaction.member.roles.cache.has(DEV_ROLE_ID) &&
-      !interaction.member.roles.cache.has(SUPERMODO_ROLE_ID)
-    ) {
-      return interaction.reply({
-        content: "🚫 Seul un membre du staff peut transférer un ticket.",
-        ephemeral: true,
-      });
-    }
-
-    // Création de la modale
-    const modal = new ModalBuilder()
-      .setCustomId("transfer-modal")
-      .setTitle("📜 Résumer de ticket");
-
-    // Champs texte
-    const playerName = new TextInputBuilder()
-      .setCustomId("player-name")
-      .setLabel("Nom du joueur concerné")
-      .setStyle(TextInputStyle.Short)
-      .setRequired(true);
-
-    const problemField = new TextInputBuilder()
-      .setCustomId("problem-description")
-      .setLabel("Description du problème")
-      .setStyle(TextInputStyle.Paragraph)
-      .setRequired(true);
-
-    const targetStaff = new TextInputBuilder()
-      .setCustomId("target-staff")
-      .setLabel("Staff destinataire (pseudo ou rôle)")
-      .setStyle(TextInputStyle.Short)
-      .setRequired(true);
-
-    // Organisation en lignes
-    const row1 = new ActionRowBuilder().addComponents(playerName);
-    const row2 = new ActionRowBuilder().addComponents(problemField);
-    const row3 = new ActionRowBuilder().addComponents(targetStaff);
-
-    modal.addComponents(row1, row2, row3);
-
-    // Envoie la modale à l'utilisateur
-    await interaction.showModal(modal);
   }
 });
 
@@ -636,177 +818,6 @@ ${htmlMessages}
   }
 }
 
-// --- Boutons close-ticket ---
-client.on("interactionCreate", async (interaction) => {
-  if (!interaction.isButton()) return;
-  const channel = interaction.channel;
-  const member = interaction.member;
-
-  if (interaction.customId === "close-ticket") {
-    const confirmButton = new ButtonBuilder().setCustomId("confirm-close").setLabel("🔒 Oui, fermer le ticket").setStyle(ButtonStyle.Danger);
-    const cancelButton = new ButtonBuilder().setCustomId("cancel-close").setLabel("🔁 Annuler").setStyle(ButtonStyle.Secondary);
-    const row = new ActionRowBuilder().addComponents(confirmButton, cancelButton);
-
-    const confirmEmbed = new EmbedBuilder()
-      .setColor("#ED4245")
-      .setTitle("❌ Confirmation de fermeture")
-      .setDescription("Êtes-vous sûr de vouloir fermer ce ticket ?\n\n> 🔒 Oui\n> 🔁 Annuler");
-
-    await interaction.reply({ embeds: [confirmEmbed], components: [row], ephemeral: true });
-  }
-
-  if (interaction.customId === "confirm-close") {
-  await interaction.update({ 
-    embeds: [new EmbedBuilder().setColor("#ED4245").setTitle("🕒 Fermeture du ticket").setDescription("Fermeture en cours...")], 
-    components: [] 
-  });
-
-  setTimeout(async () => {
-    try {
-      const html = await generateHTMLArchive(channel, member);
-      
-      // ✅ CORRIGÉ : Créer le buffer en mémoire sans écrire de fichier
-      const buffer = Buffer.from(html, 'utf-8');
-      
-      const logChannel = client.channels.cache.get(LOGS_CHANNEL_ID);
-      if (logChannel) {
-        const logEmbed = new EmbedBuilder()
-          .setColor("#2b2d31")
-          .setTitle("🗂️ Ticket archivé")
-          .setDescription(`**Ticket :** ${channel.name}\n**Fermé par :** ${member}\n**Date :** <t:${Math.floor(Date.now()/1000)}:F>`)
-          .setFooter({ text: "Système de tickets - Archive HTML" })
-          .setTimestamp();
-
-        // ✅ CORRIGÉ : Envoyer le fichier directement depuis le buffer
-        await logChannel.send({ 
-          embeds: [logEmbed], 
-          files: [{ attachment: buffer, name: `${channel.name}.html` }] 
-        });
-      }
-
-      // Supprimer le claim et le ticket
-      delete ticketClaims[channel.id];
-      await channel.delete();
-      
-    } catch (err) {
-      console.error("Erreur fermeture ticket :", err);
-      // Fermer le ticket même en cas d'erreur
-      try {
-        delete ticketClaims[channel.id];
-        await channel.delete();
-      } catch (deleteError) {
-        console.error("Erreur suppression channel:", deleteError);
-      }
-    }
-  }, 3000);
-}
-
-  if (interaction.customId === "cancel-close") {
-    await interaction.update({ embeds: [new EmbedBuilder().setColor("#57F287").setDescription("✅ Fermeture annulée. Le ticket reste ouvert !")], components: [] });
-  }
-});
-
-// === GESTION DU TRANSFERT MODAL - VERSION AVEC SYNCHRONISATION ===
-client.on("interactionCreate", async (interaction) => {
-  if (!interaction.isModalSubmit()) return;
-  if (interaction.customId !== "transfer-modal") return;
-
-  const playerName = interaction.fields.getTextInputValue("player-name");
-  const problemDescription = interaction.fields.getTextInputValue("problem-description");
-  const targetStaff = interaction.fields.getTextInputValue("target-staff").toLowerCase();
-  const channel = interaction.channel;
-  const guild = interaction.guild;
-
-  let targetCategory;
-  let targetRole;
-  let roleLabel;
-
-  // 🔍 Déterminer le rôle / catégorie cible selon ce que le staff écrit
-  if (targetStaff.includes("supermodo") || targetStaff.includes("super-modo")) {
-    targetCategory = SUPERMODO_CATEGORY_ID;
-    targetRole = SUPERMODO_ROLE_ID;
-    roleLabel = "Super-Modo";
-  } else if (targetStaff.includes("modo") || targetStaff.includes("modérateur")) {
-    targetCategory = MODO_CATEGORY_ID;
-    targetRole = MODO_ROLE_ID;
-    roleLabel = "Modérateur";
-  } else if (targetStaff.includes("admin") || targetStaff.includes("administrateur")) {
-    targetCategory = ADMIN_CATEGORY_ID;
-    targetRole = ADMIN_ROLE_ID;
-    roleLabel = "Admin";
-  } else if (targetStaff.includes("dev") || targetStaff.includes("développeur")) {
-    targetCategory = DEV_CATEGORY_ID;
-    targetRole = DEV_ROLE_ID;
-    roleLabel = "Dev";
-  } else if (targetStaff.includes("helper") || targetStaff.includes("assistant")) {
-    targetCategory = HELPER_CATEGORY_ID;
-    targetRole = HELPER_ROLE_ID;
-    roleLabel = "Helper";
-  } else {
-    return interaction.reply({
-      content: "⚠️ Impossible d'identifier le rôle cible. Utilise 'Helper', 'Modo', 'SuperModo', 'Admin', 'Dev'.",
-      ephemeral: true,
-    });
-  }
-
-  try {
-    // Récupère l'utilisateur qui a créé le ticket depuis le nom du channel
-    const ticketName = channel.name;
-    const usernameMatch = ticketName.match(/ticket-[^-]+-(.+)-/);
-    let ticketOwner = null;
-    
-    if (usernameMatch) {
-      const username = usernameMatch[1];
-      // Trouve l'utilisateur par son username
-      ticketOwner = guild.members.cache.find(member => 
-        member.user.username.toLowerCase() === username.toLowerCase()
-      );
-    }
-
-    if (!ticketOwner) {
-      return interaction.reply({
-        content: "⚠️ Impossible de trouver le propriétaire du ticket.",
-        ephemeral: true,
-      });
-    }
-
-    // SYNCHRONISE LES PERMISSIONS AVANT LE DÉPLACEMENT
-    await syncTicketPermissions(channel, targetCategory, ticketOwner);
-
-    // 🔁 Déplace le ticket
-    await channel.setParent(targetCategory, { 
-      lockPermissions: false // IMPORTANT: ne pas verrouiller les permissions
-    });
-
-    // Si un transfert a lieu, on supprime le claim actuel
-    // Le nouveau staff devra reclamer le ticket
-    delete ticketClaims[channel.id];
-
-    // 🧾 Embed de résumé
-    const embed = new EmbedBuilder()
-      .setColor("#FEE75C")
-      .setTitle("📜 Résumer de ticket")
-      .setDescription(
-        `**👤 Joueur :** ${playerName}\n**🧾 Problème :** ${problemDescription}\n**🎯 Transféré à :** ${roleLabel}`
-      )
-      .setFooter({ text: `Transféré par ${interaction.user.tag}` })
-      .setTimestamp();
-
-    await interaction.reply({
-      embeds: [embed],
-      ephemeral: false,
-    });
-
-    console.log(`✅ Ticket ${channel.name} transféré vers ${roleLabel}`);
-  } catch (err) {
-    console.error("Erreur lors du transfert :", err);
-    interaction.reply({
-      content: "⚠️ Erreur lors du transfert du ticket.",
-      ephemeral: true,
-    });
-  }
-});
-
 // 🔔 NOTIFICATION AUTOMATIQUE QUAND LE JOUEUR ENVOIE UN MESSAGE
 client.on("messageCreate", async (message) => {
   if (message.author.bot) return;
@@ -903,10 +914,3 @@ app.listen(port, () => {
 loadEvents(client);
 
 client.login(TOKEN);
-
-
-
-
-
-
-
