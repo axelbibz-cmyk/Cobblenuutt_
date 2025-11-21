@@ -819,8 +819,24 @@ client.on("messageCreate", async (message) => {
   }
 });
 
+client.on('messageCreate', message => {
+  if (message.author.bot) return;
+  
+  // ... vos autres commandes existantes ...
+
+  // 🎁 COMMANDE !GIFT - Affiche votre GIF hamster
+  if (message.content === '!gift') {
+    const giftEmbed = new EmbedBuilder()
+      .setColor('#FF69B4')
+      .setImage('https://media.tenor.com/V3He34IBrWoAAAPo/suck-hamster.mp4')
+      .setTimestamp();
+
+    message.channel.send({ embeds: [giftEmbed] });
+  }
+});
 loadEvents(client);
 
 client.login(TOKEN);
+
 
 
