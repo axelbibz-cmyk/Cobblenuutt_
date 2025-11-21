@@ -36,6 +36,7 @@ require("dotenv").config();
 // Structure pour stocker les fichiers des tickets par message
 const ticketFiles = {}; // clé = channel.id, valeur = { messageId: [fichiers] }
 const ticketActivity = {}; // clé = channel.id, valeur = timestamp du dernier message
+const { MessageFlags } = require('discord.js'); 
 
 // Stocker quel staff a claim chaque ticket
 const ticketClaims = {}; // clé = channel.id, valeur = staffMemberId
@@ -375,7 +376,7 @@ client.on("interactionCreate", async (interaction) => {
 
         await interaction.reply({
           content: `✅ Votre ticket a été créé : ${ticketChannel}`,
-          ephemeral: true,
+          flags: MessageFlags.Ephemeral
         });
         return;
       }
@@ -914,3 +915,4 @@ app.listen(port, () => {
 loadEvents(client);
 
 client.login(TOKEN);
+
