@@ -828,7 +828,7 @@ client.on('messageCreate', message => {
   if (message.content === '!gift') {
     const giftEmbed = new EmbedBuilder()
       .setColor('#FF69B4')
-      .setImage('https://media.tenor.com/V3He34IBrWoAAAPo/suck-hamster.mp4')
+      .setImage('https://tenor.com/fr/view/suck-it-hamster-carrot-gif-16172457')
       .setTimestamp();
 
     message.channel.send({ embeds: [giftEmbed] });
@@ -837,6 +837,7 @@ client.on('messageCreate', message => {
 loadEvents(client);
 
 client.login(TOKEN);
+
 
 
 
