@@ -545,43 +545,42 @@ client.on("messageCreate", async (message) => {
 });
 
 async function generateHTMLArchive(channel, member) {
-  const messages = await channel.messages.fetch({ limit: 100 });
-  const sorted = Array.from(messages.values()).reverse();
-  let htmlMessages = "";
+  try {
+    const messages = await channel.messages.fetch({ limit: 100 });
+    const sorted = Array.from(messages.values()).reverse();
+    let htmlMessages = "";
 
-  for (const m of sorted) {
-    let content = m.cleanContent || "";
-    const attachmentsHTML = [];
+    for (const m of sorted) {
+      let content = m.cleanContent || "";
+      const attachmentsHTML = [];
 
-    // VERSION CORRIGÉE : Utiliser les attachments Discord directement
-    for (const attachment of m.attachments.values()) {
-      const ext = attachment.name ? attachment.name.split('.').pop().toLowerCase() : '';
-      if (["png", "jpg", "jpeg", "gif", "webp"].includes(ext)) {
-        // Lien direct vers l'image sans téléchargement
-        attachmentsHTML.push(`<div class="attachment"><img src="${attachment.url}" class="image" alt="${attachment.name}"></div>`);
-      } else {
-        // Lien direct vers le fichier
-        attachmentsHTML.push(`<div class="attachment"><a href="${attachment.url}" target="_blank">📎 ${attachment.name}</a></div>`);
+      // Version simplifiée sans fichiers
+      for (const attachment of m.attachments.values()) {
+        const ext = attachment.name ? attachment.name.split('.').pop().toLowerCase() : '';
+        if (["png", "jpg", "jpeg", "gif", "webp"].includes(ext)) {
+          attachmentsHTML.push(`<div class="attachment"><img src="${attachment.url}" class="image" alt="${attachment.name}"></div>`);
+        } else {
+          attachmentsHTML.push(`<div class="attachment"><a href="${attachment.url}" target="_blank">📎 ${attachment.name}</a></div>`);
+        }
       }
+
+      content += attachmentsHTML.join("\n");
+
+      htmlMessages += `
+        <div class="message">
+          <img src="${m.author.displayAvatarURL({ size: 64 })}" class="avatar">
+          <div class="content">
+            <div class="header">
+              <span class="username">${m.author.tag}</span>
+              <span class="timestamp">${m.createdAt.toLocaleString()}</span>
+            </div>
+            <div class="text">${content || "<i>(message vide)</i>"}</div>
+          </div>
+        </div>
+      `;
     }
 
-    content += attachmentsHTML.join("\n");
-
-    htmlMessages += `
-      <div class="message">
-        <img src="${m.author.displayAvatarURL({ size: 64 })}" class="avatar">
-        <div class="content">
-          <div class="header">
-            <span class="username">${m.author.tag}</span>
-            <span class="timestamp">${m.createdAt.toLocaleString()}</span>
-          </div>
-          <div class="text">${content || "<i>(message vide)</i>"}</div>
-        </div>
-      </div>
-    `;
-  }
-
-  return `
+    return `
 <!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -611,6 +610,10 @@ ${htmlMessages}
 </body>
 </html>
 `;
+  } catch (error) {
+    console.error("Erreur génération archive:", error);
+    return `<html><body><h1>Archive du ticket ${channel.name}</h1><p>Erreur lors de la génération</p></body></html>`;
+  }
 }
 
 // --- Boutons close-ticket ---
@@ -633,39 +636,50 @@ client.on("interactionCreate", async (interaction) => {
   }
 
   if (interaction.customId === "confirm-close") {
-    await interaction.update({ embeds: [new EmbedBuilder().setColor("#ED4245").setTitle("🕒 Fermeture du ticket").setDescription("Archivage en cours...")], components: [] });
+  await interaction.update({ 
+    embeds: [new EmbedBuilder().setColor("#ED4245").setTitle("🕒 Fermeture du ticket").setDescription("Fermeture en cours...")], 
+    components: [] 
+  });
 
-    setTimeout(async () => {
-      try {
-        const html = await generateHTMLArchive(channel, member);
-        const htmlPath = path.join(__dirname, `tickets`, `${channel.name}.html`);
-        fs.writeFileSync(htmlPath, html);
+  setTimeout(async () => {
+    try {
+      const html = await generateHTMLArchive(channel, member);
+      
+      // ✅ CORRIGÉ : Créer le buffer en mémoire sans écrire de fichier
+      const buffer = Buffer.from(html, 'utf-8');
+      
+      const logChannel = client.channels.cache.get(LOGS_CHANNEL_ID);
+      if (logChannel) {
+        const logEmbed = new EmbedBuilder()
+          .setColor("#2b2d31")
+          .setTitle("🗂️ Ticket archivé")
+          .setDescription(`**Ticket :** ${channel.name}\n**Fermé par :** ${member}\n**Date :** <t:${Math.floor(Date.now()/1000)}:F>`)
+          .setFooter({ text: "Système de tickets - Archive HTML" })
+          .setTimestamp();
 
-        const logChannel = client.channels.cache.get(LOGS_CHANNEL_ID);
-        if (logChannel) {
-          const logEmbed = new EmbedBuilder()
-            .setColor("#2b2d31")
-            .setTitle("🗂️ Ticket archivé")
-            .setDescription(`**Ticket :** ${channel.name}\n**Fermé par :** ${member}\n**Date :** <t:${Math.floor(Date.now()/1000)}:F>`)
-            .setFooter({ text: "Système de tickets - Archive HTML" })
-            .setTimestamp();
-
-          await logChannel.send({ embeds: [logEmbed], files: [htmlPath] });
-        }
-
-        // Supprimer le dossier temporaire du ticket
-        const ticketDir = path.join(__dirname, "tickets", channel.name);
-        if (fs.existsSync(ticketDir)) fs.rmSync(ticketDir, { recursive: true, force: true });
-
-        // Supprime le claim quand le ticket est fermé
-        delete ticketClaims[channel.id];
-
-        await channel.delete();
-      } catch (err) {
-        console.error("Erreur fermeture ticket :", err);
+        // ✅ CORRIGÉ : Envoyer le fichier directement depuis le buffer
+        await logChannel.send({ 
+          embeds: [logEmbed], 
+          files: [{ attachment: buffer, name: `${channel.name}.html` }] 
+        });
       }
-    }, 5000);
-  }
+
+      // Supprimer le claim et le ticket
+      delete ticketClaims[channel.id];
+      await channel.delete();
+      
+    } catch (err) {
+      console.error("Erreur fermeture ticket :", err);
+      // Fermer le ticket même en cas d'erreur
+      try {
+        delete ticketClaims[channel.id];
+        await channel.delete();
+      } catch (deleteError) {
+        console.error("Erreur suppression channel:", deleteError);
+      }
+    }
+  }, 3000);
+}
 
   if (interaction.customId === "cancel-close") {
     await interaction.update({ embeds: [new EmbedBuilder().setColor("#57F287").setDescription("✅ Fermeture annulée. Le ticket reste ouvert !")], components: [] });
@@ -837,6 +851,7 @@ client.on('messageCreate', message => {
 loadEvents(client);
 
 client.login(TOKEN);
+
 
 
 
