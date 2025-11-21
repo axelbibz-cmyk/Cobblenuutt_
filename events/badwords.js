@@ -37,7 +37,7 @@ module.exports = {
           warnings[message.author.id] += 1;
 
           // ✅ ENVOI DANS LE SALON DE LOGS (LOG_CHANNEL_ID)
-          const logChannelId = process.env.LOGS_CHANNEL_ID;
+          const logChannelId = process.env.LOGSM_CHANNEL_ID;
           if (logChannelId) {
             const logChannel = client.channels.cache.get(logChannelId);
             if (logChannel) {
