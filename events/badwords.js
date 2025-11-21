@@ -1,6 +1,6 @@
 const { EmbedBuilder } = require("discord.js");
 
-// Stockage en mémoire (reset au redémarrage, mais mieux que rien)
+// Stockage en mémoire
 let warnings = {};
 
 module.exports = {
@@ -29,15 +29,15 @@ module.exports = {
           // Supprime le message offensant
           await message.delete();
 
-          // Message visible par tous
+          // Message visible par tous dans le salon où le message a été posté
           await message.channel.send(`🚫 ${message.author}, ton message contenait un mot interdit et a été supprimé.`);
 
           // Gestion des warnings (en mémoire)
           if (!warnings[message.author.id]) warnings[message.author.id] = 0;
           warnings[message.author.id] += 1;
 
-          // Envoi dans le canal logs pour le staff
-          const logChannelId = process.env.LOGS_CHANNEL_ID; // Utilisez la variable d'environnement
+          // ✅ ENVOI DANS LE SALON DE LOGS (LOG_CHANNEL_ID)
+          const logChannelId = process.env.LOGS_CHANNEL_ID;
           if (logChannelId) {
             const logChannel = client.channels.cache.get(logChannelId);
             if (logChannel) {
@@ -47,21 +47,22 @@ module.exports = {
 
               const embed = new EmbedBuilder()
                 .setColor(0x9B59B6)
-                .setTitle("🧹 Message supprimé pour insulte")
+                .setTitle("🧹 Message supprimé - Mot interdit")
                 .addFields(
-                  { name: "Auteur", value: `${message.author.tag}`, inline: true },
-                  { name: "Salon", value: `${message.channel}`, inline: true },
-                  { name: "Contenu supprimé", value: deletedContent },
-                  { name: "Avertissement", value: `${warnings[message.author.id]}/3`, inline: true },
-                  { name: "ID utilisateur", value: `${message.author.id}`, inline: true }
+                  { name: "👤 Auteur", value: `${message.author.tag} (\`${message.author.id}\`)`, inline: true },
+                  { name: "📌 Salon", value: `${message.channel}`, inline: true },
+                  { name: "⚠️ Avertissement", value: `**${warnings[message.author.id]}/3**`, inline: true },
+                  { name: "🗑️ Contenu supprimé", value: `\`\`\`${deletedContent}\`\`\`` },
+                  { name: "🔍 Mot détecté", value: `\`${word}\``, inline: true }
                 )
-                .setTimestamp();
+                .setTimestamp()
+                .setFooter({ text: 'Auto-modération • Système de warnings' });
 
               await logChannel.send({ embeds: [embed] });
             }
           }
 
-          console.log(`🧹 Message supprimé et avertissement ajouté : ${message.author.tag}`);
+          console.log(`🧹 Message supprimé - ${message.author.tag} - Avertissement: ${warnings[message.author.id]}/3`);
 
           // Si 3 avertissements, timeout pendant 10 minutes
           if (warnings[message.author.id] >= 3) {
@@ -71,20 +72,22 @@ module.exports = {
                 await message.member.timeout(duration, "Accumulation de 3 avertissements");
               }
 
-              // Log du timeout
+              // ✅ ENVOI DU TIMEOUT DANS LE SALON DE LOGS
               if (logChannelId) {
                 const logChannel = client.channels.cache.get(logChannelId);
                 if (logChannel) {
                   const embedTimeout = new EmbedBuilder()
                     .setColor(0xFF4500)
                     .setTitle("🔇 Timeout appliqué")
+                    .setDescription(`**${message.author.tag}** a été timeout pour 10 minutes`)
                     .addFields(
-                      { name: "Utilisateur", value: `${message.author.tag}`, inline: true },
-                      { name: "Durée", value: `10 minutes`, inline: true },
-                      { name: "Raison", value: `Accumulation de 3 avertissements` },
-                      { name: "ID utilisateur", value: `${message.author.id}`, inline: true }
+                      { name: "👤 Utilisateur", value: `${message.author.tag} (\`${message.author.id}\`)`, inline: true },
+                      { name: "⏱️ Durée", value: `10 minutes`, inline: true },
+                      { name: "📝 Raison", value: `Accumulation de 3 avertissements` },
+                      { name: "⚠️ Total d'avertissements", value: `3/3`, inline: true }
                     )
-                    .setTimestamp();
+                    .setTimestamp()
+                    .setFooter({ text: 'Auto-modération • Timeout automatique' });
 
                   await logChannel.send({ embeds: [embedTimeout] });
                 }
