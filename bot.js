@@ -848,9 +848,42 @@ client.on('messageCreate', message => {
     message.channel.send({ embeds: [giftEmbed] });
   }
 });
+
+const express = require('express');
+
+// Créer un mini serveur web pour Render
+const app = express();
+const port = process.env.PORT || 3000;
+
+app.get('/', (req, res) => {
+  res.send(`
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <title>Bot Discord - Cobblenurut</title>
+      <style>
+        body { font-family: Arial, sans-serif; text-align: center; padding: 50px; }
+        .status { color: #43B581; font-size: 24px; }
+      </style>
+    </head>
+    <body>
+      <h1>🤖 Bot Discord Opérationnel</h1>
+      <p class="status">✅ Bot connecté et en ligne</p>
+      <p>Bot: <strong>Cobblenurut</strong></p>
+      <p>Serveur de tickets Discord fonctionnel</p>
+    </body>
+    </html>
+  `);
+});
+
+// Démarrer le serveur
+app.listen(port, () => {
+  console.log(`✅ Serveur web démarré sur le port ${port}`);
+});
 loadEvents(client);
 
 client.login(TOKEN);
+
 
 
 
