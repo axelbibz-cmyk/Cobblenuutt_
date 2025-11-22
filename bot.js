@@ -912,7 +912,22 @@ app.get('/', (req, res) => {
 app.listen(port, () => {
   console.log(`✅ Serveur web démarré sur le port ${port}`);
 });
+
+const http = require('http');
+
+// Créer un serveur web simple pour garder le bot actif
+const server = http.createServer((req, res) => {
+  res.writeHead(200, { 'Content-Type': 'text/plain' });
+  res.end('🤖 Bot Discord en ligne!\n');
+});
+
+// Utiliser le port de Render ou 3000 par défaut
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, () => {
+  console.log(`✅ Serveur keep-alive démarré sur le port ${PORT}`);
+});
 loadEvents(client);
 
 client.login(TOKEN);
+
 
