@@ -18,6 +18,7 @@ process.on('exit', (code) => {
   console.log(`🚨 ATTENTION: Processus en cours de fermeture (code: ${code})`);
   console.log('🔄 Tentative de maintien en vie...');
 });
+
 const {
   Client,
   GatewayIntentBits,
@@ -70,9 +71,94 @@ const {
   LOGS_CHANNEL_ID
 } = process.env;
 
-// ✅ Bot prêt
-client.once("clientReady", () => {
+// === SYSTÈME DE DOUBLE PING AMÉLIORÉ ===
+const express = require('express');
+const pingApp = express();
+const PORT = process.env.PORT || 3000;
+
+// Route health check pour les pings externes
+pingApp.get('/health', (req, res) => {
+  res.status(200).json({ 
+    status: 'active', 
+    bot: 'online',
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+    memory: process.memoryUsage()
+  });
+});
+
+// Route de ping interne (self-ping)
+pingApp.get('/keep-alive', (req, res) => {
+  res.json({ 
+    status: 'OK', 
+    timestamp: new Date().toISOString(),
+    message: 'Self-ping successful'
+  });
+});
+
+// Page d'accueil
+pingApp.get('/', (req, res) => {
+  res.send(`
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <title>Bot Discord - Cobblenurut</title>
+      <style>
+        body { font-family: Arial, sans-serif; text-align: center; padding: 50px; }
+        .status { color: #43B581; font-size: 24px; }
+      </style>
+    </head>
+    <body>
+      <h1>🤖 Bot Discord Opérationnel</h1>
+      <p class="status">✅ Bot connecté et en ligne</p>
+      <p>Bot: <strong>Cobblenurut</strong></p>
+      <p>Serveur de tickets Discord fonctionnel</p>
+      <p><small>Système de double ping actif</small></p>
+    </body>
+    </html>
+  `);
+});
+
+// Démarrer le serveur
+pingApp.listen(PORT, () => {
+  console.log(`✅ Serveur web démarré sur le port ${PORT}`);
+  console.log(`🌐 Health check: http://localhost:${PORT}/health`);
+  console.log(`🔁 Self-ping: http://localhost:${PORT}/keep-alive`);
+});
+
+// Ping interne amélioré - Se ping soi-même toutes les 8 minutes
+function startSelfPing() {
+  const pingInterval = 8 * 60 * 1000; // 8 minutes
+  const renderUrl = process.env.RENDER_EXTERNAL_URL || `http://localhost:${PORT}`;
+  
+  console.log(`🔄 Démarrage du self-ping vers: ${renderUrl}`);
+  
+  setInterval(async () => {
+    try {
+      const response = await fetch(`${renderUrl}/keep-alive`);
+      
+      if (response.ok) {
+        const data = await response.json();
+        console.log(`🔄 Self-ping réussi: ${new Date().toLocaleTimeString()}`);
+      } else {
+        console.log(`❌ Self-ping échoué: Status ${response.status}`);
+      }
+    } catch (error) {
+      console.log('❌ Self-ping erreur:', error.message);
+      // Ne pas arrêter le processus en cas d'erreur
+    }
+  }, pingInterval);
+}
+
+// ✅ Bot prêt - Démarrer le système de ping
+client.once("ready", () => {
   console.log(`✅ Connecté en tant que ${client.user.tag}`);
+  
+  // Attendre 10 secondes avant de démarrer les pings
+  setTimeout(() => {
+    startSelfPing();
+    console.log('🔄 Système de double ping activé (interne + externe)');
+  }, 10000);
 });
 
 // 🧾 Commande pour envoyer les boutons de tickets
@@ -814,120 +900,4 @@ ${htmlMessages}
 </html>
 `;
   } catch (error) {
-    console.error("Erreur génération archive:", error);
-    return `<html><body><h1>Archive du ticket ${channel.name}</h1><p>Erreur lors de la génération</p></body></html>`;
-  }
-}
-
-// 🔔 NOTIFICATION AUTOMATIQUE QUAND LE JOUEUR ENVOIE UN MESSAGE
-client.on("messageCreate", async (message) => {
-  if (message.author.bot) return;
-  const channel = message.channel;
-
-  // Vérifie si c'est un ticket
-  if (!channel.name.startsWith("ticket-")) return;
-
-  // Vérifie si le ticket a été claim
-  const claimedStaffId = ticketClaims[channel.id];
-  if (!claimedStaffId) return;
-
-  // Vérifie que le message vient du joueur (pas du staff)
-  const isStaff = message.member.roles.cache.has(HELPER_ROLE_ID) || 
-                  message.member.roles.cache.has(MODO_ROLE_ID) || 
-                  message.member.roles.cache.has(SUPERMODO_ROLE_ID) || 
-                  message.member.roles.cache.has(ADMIN_ROLE_ID) || 
-                  message.member.roles.cache.has(DEV_ROLE_ID);
-
-  if (isStaff) return; // Ne pas ping si c'est le staff qui parle
-
-  try {
-    // Récupère le membre staff
-    const staffMember = await channel.guild.members.fetch(claimedStaffId);
-    
-    if (staffMember) {
-      // Envoie une notification discrète (presque ghost ping)
-      const notification = await message.reply({
-        content: `📨 ${staffMember} - Nouveau message de ${message.author}`,
-        allowedMentions: { users: [staffMember.id] }
-      });
-
-      // Supprime la notification après 2 secondes pour un effet "ghost ping"
-      setTimeout(async () => {
-        try {
-          await notification.delete();
-        } catch (err) {
-          // Ignore si le message a déjà été supprimé
-        }
-      }, 2000);
-    }
-  } catch (err) {
-    console.error("Erreur notification staff:", err);
-  }
-});
-
-client.on('messageCreate', message => {
-  if (message.author.bot) return;
-  
-  // ... vos autres commandes existantes ...
-
-  // 🎁 COMMANDE !GIFT - Affiche votre GIF hamster
-  if (message.content === '!gift') {
-    const giftEmbed = new EmbedBuilder()
-      .setColor('#FF69B4')
-      .setImage('https://tenor.com/fr/view/suck-it-hamster-carrot-gif-16172457')
-      .setTimestamp();
-
-    message.channel.send({ embeds: [giftEmbed] });
-  }
-});
-
-const express = require('express');
-
-// Créer un mini serveur web pour Render
-const app = express();
-const port = process.env.PORT || 3000;
-
-app.get('/', (req, res) => {
-  res.send(`
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <title>Bot Discord - Cobblenurut</title>
-      <style>
-        body { font-family: Arial, sans-serif; text-align: center; padding: 50px; }
-        .status { color: #43B581; font-size: 24px; }
-      </style>
-    </head>
-    <body>
-      <h1>🤖 Bot Discord Opérationnel</h1>
-      <p class="status">✅ Bot connecté et en ligne</p>
-      <p>Bot: <strong>Cobblenurut</strong></p>
-      <p>Serveur de tickets Discord fonctionnel</p>
-    </body>
-    </html>
-  `);
-});
-
-// Démarrer le serveur
-app.listen(port, () => {
-  console.log(`✅ Serveur web démarré sur le port ${port}`);
-});
-
-const http = require('http');
-
-// Créer un serveur web simple pour garder le bot actif
-const server = http.createServer((req, res) => {
-  res.writeHead(200, { 'Content-Type': 'text/plain' });
-  res.end('🤖 Bot Discord en ligne!\n');
-});
-
-// Utiliser le port de Render ou 3000 par défaut
-const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => {
-  console.log(`✅ Serveur keep-alive démarré sur le port ${PORT}`);
-});
-loadEvents(client);
-
-client.login(TOKEN);
-
-
+    console.error("
