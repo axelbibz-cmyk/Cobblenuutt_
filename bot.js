@@ -900,4 +900,73 @@ ${htmlMessages}
 </html>
 `;
   } catch (error) {
-    console.error("
+    console.error("Erreur génération archive:", error);
+    return `<html><body><h1>Archive du ticket ${channel.name}</h1><p>Erreur lors de la génération</p></body></html>`;
+  }
+}
+
+// 🔔 NOTIFICATION AUTOMATIQUE QUAND LE JOUEUR ENVOIE UN MESSAGE
+client.on("messageCreate", async (message) => {
+  if (message.author.bot) return;
+  const channel = message.channel;
+
+  // Vérifie si c'est un ticket
+  if (!channel.name.startsWith("ticket-")) return;
+
+  // Vérifie si le ticket a été claim
+  const claimedStaffId = ticketClaims[channel.id];
+  if (!claimedStaffId) return;
+
+  // Vérifie que le message vient du joueur (pas du staff)
+  const isStaff = message.member.roles.cache.has(HELPER_ROLE_ID) || 
+                  message.member.roles.cache.has(MODO_ROLE_ID) || 
+                  message.member.roles.cache.has(SUPERMODO_ROLE_ID) || 
+                  message.member.roles.cache.has(ADMIN_ROLE_ID) || 
+                  message.member.roles.cache.has(DEV_ROLE_ID);
+
+  if (isStaff) return; // Ne pas ping si c'est le staff qui parle
+
+  try {
+    // Récupère le membre staff
+    const staffMember = await channel.guild.members.fetch(claimedStaffId);
+    
+    if (staffMember) {
+      // Envoie une notification discrète (presque ghost ping)
+      const notification = await message.reply({
+        content: `📨 ${staffMember} - Nouveau message de ${message.author}`,
+        allowedMentions: { users: [staffMember.id] }
+      });
+
+      // Supprime la notification après 2 secondes pour un effet "ghost ping"
+      setTimeout(async () => {
+        try {
+          await notification.delete();
+        } catch (err) {
+          // Ignore si le message a déjà été supprimé
+        }
+      }, 2000);
+    }
+  } catch (err) {
+    console.error("Erreur notification staff:", err);
+  }
+});
+
+client.on('messageCreate', message => {
+  if (message.author.bot) return;
+  
+  // ... vos autres commandes existantes ...
+
+  // 🎁 COMMANDE !GIFT - Affiche votre GIF hamster
+  if (message.content === '!gift') {
+    const giftEmbed = new EmbedBuilder()
+      .setColor('#FF69B4')
+      .setImage('https://tenor.com/fr/view/suck-it-hamster-carrot-gif-16172457')
+      .setTimestamp();
+
+    message.channel.send({ embeds: [giftEmbed] });
+  }
+});
+
+loadEvents(client);
+
+client.login(TOKEN);
